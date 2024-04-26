@@ -2,8 +2,7 @@
 # 
 # Description: A simple Eisenhower matrix display for Reclaim.ai users
 
-API_KEY = "f83129f8-31fc-414c-8492-aca1d149b710" # Replace with your own API key from https://app.reclaim.ai/settings/developer
-# API_KEY = "<my_api_key>" # Replace with your own API key from https://app.reclaim.ai/settings/developer
+API_KEY = "<my_api_key>" # Replace with your own API key from https://app.reclaim.ai/settings/developer
 
 
 DISPLAY_WINDOW = true
