@@ -2,7 +2,8 @@
 # 
 # Description: A simple Eisenhower matrix display for Reclaim.ai users
 
-API_KEY = "<my_api_key>" # Replace with your own API key from https://app.reclaim.ai/settings/developer
+API_KEY = "f83129f8-31fc-414c-8492-aca1d149b710" # Replace with your own API key from https://app.reclaim.ai/settings/developer
+# API_KEY = "<my_api_key>" # Replace with your own API key from https://app.reclaim.ai/settings/developer
 
 
 DISPLAY_WINDOW = true
@@ -27,7 +28,8 @@ if install in ["y", "Y"]
     dependencies = [
         "HTTP",
         "JSON",
-        "LiveServer"
+        "LiveServer",
+        "PyCall"
     ]
 
     for dep in dependencies
@@ -36,8 +38,12 @@ if install in ["y", "Y"]
 end
 
 
-using Mousetrap, HTTP, JSON
+using Mousetrap, HTTP, JSON#, PyCall
 using LiveServer: open_in_default_browser
+
+if API_KEY == "<my_api_key>"
+    API_KEY = input("Please enter your API key: ")
+end
 
 headers = [
     "Authorization" => "Bearer $API_KEY",
@@ -83,6 +89,7 @@ end
 bold = (text::String) -> "<b>$text</b>"
 italic = (text::String) -> "<i>$text</i>"
 underline = (text::String) -> "<u>$text</u>"
+big = (text::String) -> "<big>$text</big>"
 on_deck_font = (text::String) -> "<span color='green'>$text</span>" |> italic
 function antitag(tag::String)
     if tag[2] == "/"
@@ -106,11 +113,21 @@ end
 
 function create_tasks_box(label, tasks)
     out = Box(ORIENTATION_VERTICAL)
-    push_back!(out, generate_child(bold(String(label))))
+    title_widget = Label(bold(String(label)))
+    push_back!(out, title_widget)
     for task in tasks
-        push_back!(out, Label(task["onDeck"] ? on_deck_font(task["title"]) : task["title"]))
+        task_button = Button(Label(task["onDeck"] ? on_deck_font(task["title"]) : task["title"]))
+        connect_signal_clicked!(task_button) do x::Button
+            open_in_default_browser("https://app.reclaim.ai/tasks/$(task["id"])")
+            nothing
+        end
+        push_back!(out, task_button)
     end
     return out
+    # c = ColumnView()
+    # c1 = push_back_column!(c, String(label))
+    # set_widget_at!(c, c1, 1, out)
+    # return c
 end
 
 function add_css_classes!(widget, classes...)
@@ -122,7 +139,7 @@ end
 function format_tasks_box(tasks_box, color=nothing)
     s = Separator()
     if color !== nothing
-        add_css_classes!(s, color, "opaque")
+        add_css_class!(s, color)
     end
     return Overlay(s, tasks_box)
 end
