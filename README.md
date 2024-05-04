@@ -15,7 +15,9 @@ The app allows users to view and interact with their tasks in a succinct visual 
   
 ## Usage Notes
 
-- Before running the Julia script, obtain an API key from https://app.reclaim.ai/settings/developer and copy it into the `API_KEY` variable at the top of the script. The `DARK_MODE` variable can also be set to `true` or `false` depending on the user's preference.
+- Before running the Julia script, obtain an API key from https://app.reclaim.ai/settings/developer and copy it into the `API_KEY` variable at the top of the script. Alternatively, you can copy the key into the terminal/REPL when prompted upon running the script.
+
+- The `DARK_MODE` variable at the top of the script can be set to `true` or `false` depending on the user's preference.
 
 - Run `julia <path_to_script_directory>/AIsenhower.jl` in the terminal or `include("<path_to_script_directory>/AIsenhower.jl")` in the Julia REPL to start the app. The script will stop running when the GUI window is closed.
 

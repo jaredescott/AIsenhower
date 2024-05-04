@@ -15,6 +15,14 @@ const DARK_MODE = true
 const API_URL = "https://api.app.reclaim.ai/api/tasks?status=NEW%2CSCHEDULED%2CIN_PROGRESS%2CCOMPLETE&instances=true"
 const VIEWPORT_HEIGHT_RATIO = 25/4
 const LABEL_WIDTH = 51
+const priority_to_action = Dict(
+    "P1" => :DO,
+    "P2" => :DECIDE,
+    "P3" => :DELEGATE,
+    "P4" => :DELETE
+)
+const action_to_priority = Dict(v => k for (k, v) in (priority_to_action))
+
 const DEPENDENCIES = [
     "HTTP",
     "JSON",
@@ -32,11 +40,13 @@ end
 
 @info "Loading dependencies..."
 
+# Check if Mousetrap package is installed, if not, install and test it
 if !is_installed("Mousetrap")
     Pkg.add(url="https://github.com/clemapfel/mousetrap.jl")
     Pkg.test("Mousetrap")
 end
 
+# Check if other required packages are installed, if not, install them
 for dependency in DEPENDENCIES
     if !is_installed(dependency)
         Pkg.add(dependency)
@@ -46,59 +56,6 @@ end
 using Mousetrap, HTTP
 using JSON: parse
 using LiveServer: open_in_default_browser
-
-function get_tasks(url::String, token::String, _anonymous::Bool=false)
-    @info "Fetching tasks..."
-
-    headers = [
-        "Authorization" => "Bearer $token",
-        "Content-Type" => "application/json",
-        "Accept" => "application/json"
-    ]
-
-    response = HTTP.get(url, headers)
-    tasks = parse(String(response.body))
-
-    if _anonymous
-        i = 0
-        for task in tasks
-            task["title"] = " "^40 * "Task $(i += 1)" * " "^40
-        end
-    end
-
-    # @info "Tasks fetched."
-    return tasks
-end
-
-function reversed_dict(d::Dict)
-    return Dict(v => k for (k, v) in d)
-end
-
-const priority_to_action = Dict(
-    "P1" => :DO,
-    "P2" => :DECIDE,
-    "P3" => :DELEGATE,
-    "P4" => :DELETE
-)
-const action_to_priority = reversed_dict(priority_to_action)
-
-function partition_tasks(tasks)
-    @info "Organizing tasks..."
-    task_matrix = Dict{Symbol, Array{Dict{String, Any}, 1}}(
-        :DO => [],
-        :DECIDE => [],
-        :DELEGATE => [],
-        :DELETE => []
-    )
-
-    for task in tasks
-        priority = task["priority"]
-        # priority = task["onDeck"] ? "P1" : task["priority"] # Uncomment to prioritize "on deck" tasks
-        push!(task_matrix[priority_to_action[priority]], task)
-    end
-
-    return task_matrix
-end
 
 struct Tags
     bold::String
@@ -134,6 +91,51 @@ const format = TextFormat(
     (text::String, target_length::Int) -> "$(repeat(" ", round((target_length - length(text))/2)))$text$(repeat(" ", round((target_length - length(text))/2)))"
 )
 
+@enum TaskType WORK PERSONAL FOCUS OTHER_PERSONAL
+function get_tasks(url::String, token::String, filter_by_types::Union{Array{TaskType,1}, NTuple}=instances(TaskType), hide_titles::Bool=false)
+    @info "Fetching tasks..."
+
+    headers = [
+        "Authorization" => "Bearer $token",
+        "Content-Type" => "application/json",
+        "Accept" => "application/json"
+    ]
+
+    response = HTTP.get(url, headers)
+    tasks = parse(String(response.body))
+    tasks_out::Array{Dict{String, Any}, 1} = []
+
+    i = 0
+    for task in tasks
+        if hide_titles
+            task["title"] = format.pad("Task $(i += 1)", 80)
+        end
+        if occursin(task["eventCategory"], "$filter_by_types") || occursin(task["eventSubType"], "$(filter_by_types)")
+            push!(tasks_out, task)
+        end
+    end
+
+    # @info "Tasks fetched."
+    return tasks_out
+end
+
+function partition_tasks(tasks)
+    @info "Organizing tasks..."
+    task_matrix = Dict{Symbol, Array{Dict{String, Any}, 1}}(
+        :DO => [],
+        :DECIDE => [],
+        :DELEGATE => [],
+        :DELETE => []
+    )
+
+    for task in tasks
+        priority = task["priority"]
+        # priority = task["onDeck"] ? "P1" : task["priority"] # Uncomment to prioritize "on deck" tasks
+        push!(task_matrix[priority_to_action[priority]], task)
+    end
+
+    return task_matrix
+end
 
 function generate_child(label::String)
     matrix = Frame(Overlay(Separator(), Label(label)))
@@ -191,8 +193,8 @@ main() do AIsenhower::Application
     set_expand!(window, true)
     set_title!(window, "AIsenhower")
 
-    api_key = API_KEY == "<my_api_key>" ? input("Please enter your API key: ") : API_KEY
-    tasks = get_tasks(API_URL, api_key, true)[1:30]
+    api_key = (API_KEY == "<my_api_key>" ? input("Please enter your API key: ") : API_KEY)
+    tasks = get_tasks(API_URL, api_key)
     task_matrix = partition_tasks(tasks)
     sublabel_format = (text::String) -> text |> format.parenthesize |> format.italic
 
@@ -211,7 +213,6 @@ main() do AIsenhower::Application
     )
     set_expand!.(values(viewports), true)
     min_height = maximum(length.(t["title"] for t in tasks)) * VIEWPORT_HEIGHT_RATIO
-    println(min_height)
     for viewport in values(viewports)
         set_size_request!(viewport, Vector2f(0, min_height/2))
     end
@@ -265,4 +266,3 @@ main() do AIsenhower::Application
     @info "Displaying Eisenhower matrix..."
     present!(window)
 end
-
